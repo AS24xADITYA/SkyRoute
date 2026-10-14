@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# C Build Binaries & Objects
+*.exe
+*.o
+*.obj
+obj/
+bin/
+
+# IDE & Editor metadata
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*

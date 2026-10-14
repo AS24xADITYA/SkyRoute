@@ -1,0 +1,26 @@
+{
+  "name": "skyroute",
+  "version": "1.0.0",
+  "description": "Smart Autonomous Drone Delivery & Algorithmic Dispatch Simulation Platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "gcc -std=c11 -Wall -Wextra src/*.c -o skyroute.exe",
+    "clean": "del /f /q skyroute.exe 2>nul || rm -f skyroute.exe"
+  },
+  "keywords": [
+    "dsa",
+    "drone-delivery",
+    "algorithms",
+    "dijkstra",
+    "graph",
+    "trie",
+    "binary-search-tree",
+    "min-heap"
+  ],
+  "author": "Aditya Shinde (AS24xADITYA)",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

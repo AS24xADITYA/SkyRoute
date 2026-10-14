@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkyRoute — Autonomous Air Corridor & Algorithmic Dispatch System</title>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- D3.js v7 for Dynamic Flight Topology -->
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Enterprise Top Navigation Bar -->
+        <header class="navbar">
+            <div class="nav-brand">
+                <div class="logo-mark" title="SkyRoute Mission Control">
+                    <!-- Minimalist Geometric Drone & Air Corridor Vector Logo -->
+                    <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="16" cy="16" r="14" stroke="rgba(59, 130, 246, 0.35)" stroke-width="1.5" />
+                        <path d="M16 6L23 16L16 26L9 16L16 6Z" stroke="#3b82f6" stroke-width="2" stroke-linejoin="round" />
+                        <circle cx="16" cy="16" r="3" fill="#60a5fa" />
+                        <circle cx="7" cy="7" r="2" fill="#93c5fd" />
+                        <circle cx="25" cy="7" r="2" fill="#93c5fd" />
+                        <circle cx="7" cy="25" r="2" fill="#93c5fd" />
+                        <circle cx="25" cy="25" r="2" fill="#93c5fd" />
+                        <line x1="9" y1="9" x2="14" y2="14" stroke="rgba(255,255,255,0.4)" stroke-width="1.2" />
+                        <line x1="23" y1="9" x2="18" y2="14" stroke="rgba(255,255,255,0.4)" stroke-width="1.2" />
+                        <line x1="9" y1="23" x2="14" y2="18" stroke="rgba(255,255,255,0.4)" stroke-width="1.2" />
+                        <line x1="23" y1="23" x2="18" y2="18" stroke="rgba(255,255,255,0.4)" stroke-width="1.2" />
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <div class="brand-title">SkyRoute</div>
+                    <span class="sub-label">Autonomous Air-Corridor Dispatch & Algorithmic Platform</span>
+                </div>
+            </div>
+
+            <!-- Global Real-Time Metrics -->
+            <div class="nav-metrics">
+                <div class="metric-pill" title="Registered Fleet Units">
+                    <span class="pill-dot blue"></span>
+                    <span class="pill-title">Fleet</span>
+                    <span class="pill-value" id="stat-drones">0</span>
+                </div>
+                <div class="metric-pill" title="Pending Dispatch Requests">
+                    <span class="pill-dot amber"></span>
+                    <span class="pill-title">Pending Orders</span>
+                    <span class="pill-value" id="stat-orders">0</span>
+                </div>
+                <div class="metric-pill" title="Restricted Airspace Links">
+                    <span class="pill-dot red"></span>
+                    <span class="pill-title">No-Fly Zones</span>
+                    <span class="pill-value" id="stat-nofly">0</span>
+                </div>
+                <div class="metric-pill" title="Connected Sub-graphs (DSU)">
+                    <span class="pill-dot green"></span>
+                    <span class="pill-title">Partitions</span>
+                    <span class="pill-value" id="stat-components">1</span>
+                </div>
+                <div class="status-indicator online" id="system-status">
+                    <span class="pulse-beacon"></span>
+                    <span>C ENGINE ACTIVE</span>
+                </div>
+            </div>
+
+            <!-- Global Action Controls -->
+            <div class="nav-actions">
+                <button class="btn btn-secondary" onclick="initDemoData()" title="Pre-populate 14 nodes, 17 edges, 6 drones, 8 customers, and 5 orders">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                    Reset Demo Network
+                </button>
+                <button class="btn btn-primary" onclick="assignNextOrder()" title="Execute Dijkstra Shortest Path dispatch and animate flight route">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                    Dispatch Next Order
+                </button>
+                <button class="btn btn-outline" onclick="triggerUndo()" title="Revert last assignment via LIFO Stack">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    Undo Dispatch
+                </button>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs Bar -->
+        <nav class="tab-bar">
+            <button class="tab-btn active" data-tab="tab-radar">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20M2 12a14.5 14.5 0 0 0 20 0"/></svg>
+                Airspace Radar & Corridors
+            </button>
+            <button class="tab-btn" data-tab="tab-fleet">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                Fleet Commander (Sorting & Hash Map)
+            </button>
+            <button class="tab-btn" data-tab="tab-dispatch">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                Priority Queues & Min-Heap
+            </button>
+            <button class="tab-btn" data-tab="tab-algorithms">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Floyd-Warshall & Union-Find
+            </button>
+            <button class="tab-btn" data-tab="tab-explorer">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                Trie & BST Directory
+            </button>
+        </nav>
+
+        <!-- Main Workspace Viewport -->
+        <main class="content-viewport">
+
+            <!-- ─── TAB 1: RADAR & AIR CORRIDORS ─── -->
+            <section class="tab-pane active" id="tab-radar">
+                <div class="radar-layout">
+                    <!-- Graph Visualizer Frame -->
+                    <div class="graph-card">
+                        <div class="card-header">
+                            <div class="header-info">
+                                <h2>Air Corridor Network Topology</h2>
+                                <p class="card-caption">Interactive airspace map. Click any corridor to toggle No-Fly restriction.</p>
+                            </div>
+                            <div class="graph-legend">
+                                <span class="legend-item"><span class="node-dot warehouse"></span> Hub/Depot</span>
+                                <span class="legend-item"><span class="node-dot station"></span> Solar Charging Bay</span>
+                                <span class="legend-item"><span class="node-dot customer"></span> Customer Zone</span>
+                                <span class="legend-item"><span class="edge-line open"></span> Clear Corridor</span>
+                                <span class="legend-item"><span class="edge-line nofly"></span> No-Fly Zone</span>
+                            </div>
+                            <div class="graph-actions">
+                                <button class="btn btn-sm btn-outline" onclick="zoomInGraph()" title="Zoom In">+</button>
+                                <button class="btn btn-sm btn-outline" onclick="zoomOutGraph()" title="Zoom Out">&minus;</button>
+                                <button class="btn btn-sm btn-outline" onclick="resetGraphZoom()" title="Reset View">Fit Map</button>
+                                <button class="btn btn-sm btn-secondary" onclick="showAddEdgeModal()">+ Corridor</button>
+                            </div>
+                        </div>
+
+                        <!-- SVG Stage -->
+                        <div class="svg-stage" id="graph-container">
+                            <div class="map-floating-controls">
+                                <button class="map-ctrl-btn" onclick="zoomInGraph()" title="Zoom In">+</button>
+                                <button class="map-ctrl-btn" onclick="zoomOutGraph()" title="Zoom Out">&minus;</button>
+                                <button class="map-ctrl-btn" onclick="resetGraphZoom()" title="Fit View">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                                </button>
+                            </div>
+                            <svg id="network-svg" width="100%" height="100%"></svg>
+
+                            <!-- In-Flight Mission Banner -->
+                            <div class="flight-hud hidden" id="flight-hud">
+                                <div class="hud-icon">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2">
+                                        <polygon points="12 2 19 21 12 17 5 21 12 2"/>
+                                    </svg>
+                                </div>
+                                <div class="hud-details">
+                                    <div class="hud-title" id="hud-title">Drone Dispatched</div>
+                                    <div class="hud-path" id="hud-path">Path: Computing trajectory...</div>
+                                </div>
+                                <div class="hud-progress-bar">
+                                    <div class="hud-progress-fill" id="hud-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Sidebar: Trajectory Calculator & Airspace Controls -->
+                    <aside class="radar-sidebar">
+                        <div class="panel-card">
+                            <div class="card-header-compact">
+                                <h3>Shortest Route Calculator</h3>
+                                <span class="badge-tech">Dijkstra & BFS</span>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label>Origin Node</label>
+                                    <select id="route-src" class="input-dark"></select>
+                                </div>
+                                <div class="form-field">
+                                    <label>Destination Node</label>
+                                    <select id="route-dst" class="input-dark"></select>
+                                </div>
+                            </div>
+                            <div class="button-group">
+                                <button class="btn btn-sm btn-primary" onclick="calculateDijkstra()">Run Dijkstra (Weighted)</button>
+                                <button class="btn btn-sm btn-secondary" onclick="calculateBFS()">Run BFS (Min Hops)</button>
+                            </div>
+                            <div class="route-result-box" id="route-output">
+                                <span class="muted-text">Select origin & destination to compute optimal flight trajectory.</span>
+                            </div>
+                        </div>
+
+                        <!-- No-Fly Zone Management -->
+                        <div class="panel-card">
+                            <div class="card-header-compact">
+                                <h3>Airspace Restrictions</h3>
+                                <span class="badge-tech">Adjacency Mask</span>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label>Node U</label>
+                                    <input type="number" id="nofly-u" class="input-dark" value="1" min="0">
+                                </div>
+                                <div class="form-field">
+                                    <label>Node V</label>
+                                    <input type="number" id="nofly-v" class="input-dark" value="6" min="0">
+                                </div>
+                            </div>
+                            <div class="button-group">
+                                <button class="btn btn-sm btn-danger" onclick="toggleNoFly(0)">Enforce No-Fly</button>
+                                <button class="btn btn-sm btn-outline" onclick="toggleNoFly(1)">Lift Restriction</button>
+                            </div>
+                            <div class="nofly-list" id="nofly-active-list">
+                                <span class="muted-text">No active airspace restrictions.</span>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </section>
+
+            <!-- ─── TAB 2: FLEET COMMANDER ─── -->
+            <section class="tab-pane" id="tab-fleet">
+                <div class="fleet-layout">
+                    <!-- Fleet Control Toolbar -->
+                    <div class="fleet-controls-bar">
+                        <div class="controls-left">
+                            <button class="btn btn-primary" onclick="showAddDroneModal()">+ Register Drone</button>
+                            <!-- Sorting Buttons with clear algorithm identification -->
+                            <button class="btn btn-secondary" onclick="sortFleet('merge_desc')" title="Merge Sort O(n log n): Sorts drones with highest battery first">
+                                Merge Sort (Battery: High → Low)
+                            </button>
+                            <button class="btn btn-secondary" onclick="sortFleet('heap_asc')" title="Heap Sort O(n log n): Sorts drones with lowest battery first">
+                                Heap Sort (Battery: Low → High)
+                            </button>
+                            <button class="btn btn-secondary" onclick="sortFleet('id_asc')" title="Quick Sort O(n log n): Sorts drones sequentially by ID for Binary Search">
+                                Quick Sort (Drone ID: Asc)
+                            </button>
+                        </div>
+                        <div class="controls-right search-box">
+                            <input type="number" id="search-drone-id" class="input-dark" placeholder="Enter Drone ID (e.g. 101)">
+                            <button class="btn btn-outline" onclick="searchDrone()">Lookup Drone</button>
+                        </div>
+                    </div>
+
+                    <!-- Active Sort Indicator Banner -->
+                    <div class="sort-indicator-row">
+                        <span class="sort-tag-label">Active Sorting:</span>
+                        <span class="badge-tech" id="active-sort-badge">Default Order (Array Index)</span>
+                    </div>
+
+                    <!-- Search Result Feedback -->
+                    <div class="search-result-banner hidden" id="drone-search-banner"></div>
+
+                    <!-- Fleet Cards Grid -->
+                    <div class="drone-grid" id="drone-cards-container">
+                        <!-- Populated by JavaScript -->
+                    </div>
+
+                    <!-- Automated Solar Charging Bays -->
+                    <div class="stations-section">
+                        <div class="card-header">
+                            <div>
+                                <h2>Automated Solar Charging Bays</h2>
+                                <p class="card-caption">Queued turnaround management. Drones enter FIFO queue when all bays are occupied.</p>
+                            </div>
+                            <button class="btn btn-sm btn-outline" onclick="showAddStationModal()">+ Deploy Station</button>
+                        </div>
+                        <div class="stations-grid" id="stations-container">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── TAB 3: PRIORITY DISPATCH & MIN-HEAP ─── -->
+            <section class="tab-pane" id="tab-dispatch">
+                <div class="dispatch-layout">
+                    <!-- Queues Column -->
+                    <div class="queue-col">
+                        <div class="panel-card">
+                            <div class="card-header">
+                                <div>
+                                    <h2>Active Dispatch Queues</h2>
+                                    <p class="card-caption">Dual FIFO queues partitioned by priority classification.</p>
+                                </div>
+                                <button class="btn btn-sm btn-primary" onclick="showAddOrderModal()">+ New Delivery Request</button>
+                            </div>
+
+                            <div class="queues-comparison">
+                                <!-- Emergency Queue -->
+                                <div class="queue-bucket emergency-bucket">
+                                    <div class="bucket-header">
+                                        <span class="badge badge-emergency">EMERGENCY QUEUE (FIFO)</span>
+                                        <span class="badge-count" id="emergency-count">0</span>
+                                    </div>
+                                    <div class="order-items-list" id="emergency-orders-list">
+                                        <div class="empty-state">No emergency requests queued</div>
+                                    </div>
+                                </div>
+
+                                <!-- Normal Queue -->
+                                <div class="queue-bucket normal-bucket">
+                                    <div class="bucket-header">
+                                        <span class="badge badge-normal">STANDARD QUEUE (FIFO)</span>
+                                        <span class="badge-count" id="normal-count">0</span>
+                                    </div>
+                                    <div class="order-items-list" id="normal-orders-list">
+                                        <div class="empty-state">No standard requests queued</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LIFO Undo Stack -->
+                        <div class="panel-card">
+                            <div class="card-header-compact">
+                                <h3>Assignment History (LIFO Undo Stack)</h3>
+                                <span class="badge-tech">O(1) Push / Pop</span>
+                            </div>
+                            <p class="card-caption">Maintains assignment snapshots for one-click rollback.</p>
+                            <div class="stack-visualizer" id="undo-stack-view">
+                                <div class="empty-state">Undo stack is currently empty</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Min-Heap Column -->
+                    <div class="heap-col">
+                        <div class="panel-card h-full">
+                            <div class="card-header">
+                                <div>
+                                    <h2>Binary Min-Heap Priority Queue</h2>
+                                    <p class="card-caption">Composite priority structure. Emergency orders mapped to lowest keys for O(log n) extract-min.</p>
+                                </div>
+                                <span class="badge-tech">O(log n) Sift-Up/Down</span>
+                            </div>
+
+                            <div class="heap-array-view">
+                                <div class="section-micro-title">ARRAY BUFFER REPRESENTATION [data[i]]:</div>
+                                <div class="array-slots-row" id="heap-array-slots">
+                                    <span class="muted-text">Heap is empty</span>
+                                </div>
+                            </div>
+
+                            <div class="heap-tree-stage" id="heap-tree-container">
+                                <svg id="heap-tree-svg" width="100%" height="320"></svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── TAB 4: FLOYD-WARSHALL & GRAPH CONNECTIVITY ─── -->
+            <section class="tab-pane" id="tab-algorithms">
+                <div class="algorithms-layout">
+                    <!-- Floyd-Warshall Matrix -->
+                    <div class="panel-card">
+                        <div class="card-header">
+                            <div>
+                                <h2>Floyd-Warshall All-Pairs Distance Matrix</h2>
+                                <p class="card-caption">Exhaustive dynamic programming matrix in O(V³). Click any cell to load the corridor route into the radar.</p>
+                            </div>
+                            <button class="btn btn-secondary btn-sm" onclick="computeFloydWarshall()">Compute Matrix</button>
+                        </div>
+                        <div class="matrix-table-wrapper" id="floyd-table-container">
+                            <div class="empty-state">Loading distance matrix...</div>
+                        </div>
+                    </div>
+
+                    <!-- Graph Connectivity & DAG Topo Sort -->
+                    <div class="connectivity-grid">
+                        <div class="panel-card">
+                            <div class="card-header">
+                                <div>
+                                    <h2>Union-Find (DSU) & DFS Sub-graphs</h2>
+                                    <p class="card-caption">Near-constant time O(&alpha;(n)) path compression partition check.</p>
+                                </div>
+                                <button class="btn btn-sm btn-outline" onclick="checkComponents()">Audit Connectivity</button>
+                            </div>
+                            <div class="components-display" id="components-output">
+                                <div class="empty-state">Auditing network corridors...</div>
+                            </div>
+                        </div>
+
+                        <div class="panel-card">
+                            <div class="card-header">
+                                <div>
+                                    <h2>Topological Sort: Multi-Stage Dispatch DAG</h2>
+                                    <p class="card-caption">Kahn's in-degree queue algorithm for linearizing pre-flight task dependencies.</p>
+                                </div>
+                                <button class="btn btn-sm btn-outline" onclick="runTopoSort()">Simulate DAG Stages</button>
+                            </div>
+                            <div class="topo-pipeline-view" id="topo-pipeline-container">
+                                <div class="empty-state">Simulating pipeline stages...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── TAB 5: TRIE & BST DIRECTORY ─── -->
+            <section class="tab-pane" id="tab-explorer">
+                <div class="explorer-layout">
+                    <!-- Trie Prefix Autocomplete -->
+                    <div class="panel-card">
+                        <div class="card-header">
+                            <div>
+                                <h2>Trie (Prefix Tree) Autocomplete</h2>
+                                <p class="card-caption">Instant O(L) prefix-matching lookup over registered customer directory.</p>
+                            </div>
+                            <span class="badge-tech">26-way Branching Trie</span>
+                        </div>
+                        <div class="trie-search-bar">
+                            <input type="text" id="trie-query-input" class="input-dark input-lg" placeholder="Type customer prefix (e.g. 'al', 'ch', 'di', 'ev')..." oninput="onTrieInput(this.value)">
+                        </div>
+                        <div class="trie-results-grid" id="trie-results">
+                            <div class="muted-text">Type prefix to query Trie nodes...</div>
+                        </div>
+                    </div>
+
+                    <!-- Customer BST Ledger -->
+                    <div class="panel-card">
+                        <div class="card-header">
+                            <div>
+                                <h2>Customer Binary Search Tree (BST)</h2>
+                                <p class="card-caption">Organized by Customer ID. In-order traversal produces sorted ledger.</p>
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="showAddCustomerModal()">+ Register Customer</button>
+                        </div>
+                        <div class="bst-lookup-bar">
+                            <input type="number" id="bst-search-id" class="input-dark" placeholder="Enter Customer ID to search">
+                            <button class="btn btn-outline btn-sm" onclick="searchCustomerBST()">Trace BST Path</button>
+                        </div>
+                        <div class="bst-path-result hidden" id="bst-trace-banner"></div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Customer ID</th>
+                                        <th>Name</th>
+                                        <th>Destination Node</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="customers-bst-body">
+                                    <!-- Populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Live Telemetry Terminal -->
+        <footer class="telemetry-bar" id="telemetry-bar">
+            <div class="telemetry-header">
+                <span class="telemetry-title">
+                    <span class="console-prompt">&gt;</span> LIVE ALGORITHM TELEMETRY STREAM
+                </span>
+                <div class="telemetry-ctrls">
+                    <button class="btn-clear-log" id="btn-toggle-telemetry" onclick="toggleTelemetry()">Collapse</button>
+                    <button class="btn-clear-log" onclick="clearLogs()">Clear Console</button>
+                </div>
+            </div>
+            <div class="telemetry-stream" id="telemetry-log">
+                <div class="log-entry system"><span class="log-time">[INIT]</span> SkyRoute platform loaded. Connected to C engine.</div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ─── MODALS ─── -->
+
+    <!-- Register Drone Modal -->
+    <div class="modal-overlay" id="modal-drone">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3>Register Fleet Drone</h3>
+                <button class="btn-close" onclick="closeModal('modal-drone')">&times;</button>
+            </div>
+            <form id="form-drone" onsubmit="submitAddDrone(event)">
+                <div class="form-group">
+                    <label>Drone ID (Integer)</label>
+                    <input type="number" id="m-drone-id" class="input-dark" required placeholder="e.g. 107">
+                </div>
+                <div class="form-group">
+                    <label>Battery Capacity (0 - 100%)</label>
+                    <input type="number" id="m-drone-battery" class="input-dark" min="5" max="100" value="100" required>
+                </div>
+                <div class="form-group">
+                    <label>Stationed Node ID</label>
+                    <input type="number" id="m-drone-location" class="input-dark" value="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Max Carry Capacity (kg)</label>
+                    <input type="number" id="m-drone-weight" class="input-dark" step="0.1" value="5.0" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-drone')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Deploy to Fleet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Submit Order Modal -->
+    <div class="modal-overlay" id="modal-order">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3>Submit Delivery Request</h3>
+                <button class="btn-close" onclick="closeModal('modal-order')">&times;</button>
+            </div>
+            <form id="form-order" onsubmit="submitAddOrder(event)">
+                <div class="form-group">
+                    <label>Order ID (Integer)</label>
+                    <input type="number" id="m-order-id" class="input-dark" required placeholder="e.g. 506">
+                </div>
+                <div class="form-group">
+                    <label>Recipient Customer</label>
+                    <select id="m-order-customer" class="input-dark" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Package Weight (kg)</label>
+                    <input type="number" id="m-order-weight" class="input-dark" step="0.1" value="2.5" required>
+                </div>
+                <div class="form-group">
+                    <label>Priority Classification</label>
+                    <select id="m-order-priority" class="input-dark">
+                        <option value="0">Standard Delivery (Normal FIFO Queue)</option>
+                        <option value="1">Critical / Medical (Emergency Queue & Min-Heap Priority)</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-order')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Queue Dispatch Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Register Customer Modal -->
+    <div class="modal-overlay" id="modal-customer">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3>Register Customer</h3>
+                <button class="btn-close" onclick="closeModal('modal-customer')">&times;</button>
+            </div>
+            <form id="form-customer" onsubmit="submitAddCustomer(event)">
+                <div class="form-group">
+                    <label>Customer ID</label>
+                    <input type="number" id="m-cust-id" class="input-dark" required placeholder="e.g. 9">
+                </div>
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="m-cust-name" class="input-dark" required placeholder="e.g. Olivia Wilde">
+                </div>
+                <div class="form-group">
+                    <label>Delivery Node ID</label>
+                    <input type="number" id="m-cust-node" class="input-dark" value="6" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-customer')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Register Customer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Air Corridor Modal -->
+    <div class="modal-overlay" id="modal-edge">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3>Add Air Corridor</h3>
+                <button class="btn-close" onclick="closeModal('modal-edge')">&times;</button>
+            </div>
+            <form id="form-edge" onsubmit="submitAddEdge(event)">
+                <div class="form-group">
+                    <label>Source Node U</label>
+                    <input type="number" id="m-edge-u" class="input-dark" value="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Target Node V</label>
+                    <input type="number" id="m-edge-v" class="input-dark" value="6" required>
+                </div>
+                <div class="form-group">
+                    <label>Flight Distance (km)</label>
+                    <input type="number" id="m-edge-dist" class="input-dark" step="0.1" value="3.5" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-edge')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Connect Airspace</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Station Modal -->
+    <div class="modal-overlay" id="modal-station">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3>Deploy Solar Charging Bay</h3>
+                <button class="btn-close" onclick="closeModal('modal-station')">&times;</button>
+            </div>
+            <form id="form-station" onsubmit="submitAddStation(event)">
+                <div class="form-group">
+                    <label>Station ID</label>
+                    <input type="number" id="m-station-id" class="input-dark" required placeholder="e.g. 104">
+                </div>
+                <div class="form-group">
+                    <label>Graph Node ID</label>
+                    <input type="number" id="m-station-node" class="input-dark" value="3" required>
+                </div>
+                <div class="form-group">
+                    <label>Charging Pad Slots</label>
+                    <input type="number" id="m-station-slots" class="input-dark" value="2" min="1" max="10" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-station')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Deploy Bay</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dock Drone at Station Modal (Replaces browser prompt) -->
+    <div class="modal-overlay" id="modal-dock">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3 id="dock-modal-title">Dock Drone for Recharging</h3>
+                <button class="btn-close" onclick="closeModal('modal-dock')">&times;</button>
+            </div>
+            <form id="form-dock" onsubmit="submitDockDrone(event)">
+                <input type="hidden" id="dock-drone-id">
+                <div class="form-group">
+                    <label>Select Charging Station</label>
+                    <select id="dock-station-select" class="input-dark" required>
+                        <!-- Populated by JavaScript -->
+                    </select>
+                </div>
+                <p class="modal-hint">If all pads are occupied, the drone will automatically join the station's FIFO waiting queue.</p>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-dock')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Confirm Docking</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Decommission Drone Modal (Replaces browser confirm) -->
+    <div class="modal-overlay" id="modal-decommission">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3>Confirm Decommission</h3>
+                <button class="btn-close" onclick="closeModal('modal-decommission')">&times;</button>
+            </div>
+            <div style="padding: 1.25rem 0;">
+                <p id="decommission-modal-msg" style="color: var(--text-primary); font-size: 0.95rem;">
+                    Are you sure you want to decommission this drone from active duty?
+                </p>
+                <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">
+                    This will remove the drone from the fleet array and re-index the hash table in O(n).
+                </p>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-decommission')">Keep Drone</button>
+                <button type="button" class="btn btn-danger" id="btn-confirm-decommission" onclick="confirmDecommission()">Decommission Drone</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
